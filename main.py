@@ -1,259 +1,242 @@
-import pygame
-import pygame.locals
-import configparser
+import pygame, random
+from pygame.locals import *
 
 ################################################################
 #CONFIGURAÇÕES PRINCIPAIS
 TITLE = 'Escape the House'
-WIDTH = 960
-HEIGHT = 544
+SCREEN_WIDTH = 320
+SCREEN_HEIGHT = 288
 FPS = 30
+
+#Velocidade do protag
+CHAR_WIDTH, CHAR_HEIGHT = ((32),(32))
+SPEED = 5
+
+#Medidas do ground
+GROUND_WIDTH = 2 * SCREEN_WIDTH
+GROUND_HEIGHT = 100
+
+#Medidas da Pipe
+PIPE_WIDTH = 80
+PIPE_HEIGHT = 500
+PIPE_GAP = 200
+
+#gravidade
+GRAVITY = 1
+#velocidade horizontal do jogo
+GAME_SPEED = 10
+
+#Criar classe Bird, o personagem principal
+class Bird(pygame.sprite.Sprite):
+
+    #código de inicialização de toda classe Sprite do pygame
+    def __init__(self):
+        #inicializar sprite
+        pygame.sprite.Sprite.__init__(self)
+
+        #Objeto com todas as imagens do protag, para animações
+        self.images = [
+            pygame.image.load('assets/personagens/protagonista/front1.png').convert_alpha(),
+            pygame.image.load('assets/personagens/protagonista/front2.png').convert_alpha(),
+        ]
+        # Tamanho das sprites
+        for i in range(len(self.images)):
+            self.images[i] = pygame.transform.scale(self.images[i], (CHAR_WIDTH, CHAR_HEIGHT))
+
+        #Velocidade
+        self.speed = SPEED
+
+        #imagem do começo
+        self.current_image = 0
+        #A função convert_alpha faz imagens png serem transparentes
+        self.image = pygame.image.load('assets/personagens/protagonista/front1.png').convert_alpha()
+        #Criar máscara de colisão
+        self.mask = pygame.mask.from_surface(self.image)
+        #Necessário para posicionar a sprite na tela
+        self.rect = self.image.get_rect()
+        #Desenhar o pássaro na metade da tela. o [0] se refere a posição X
+        self.rect[0] = SCREEN_WIDTH / 2
+        #Desenhar o pássaro na metade da tela. o [1] se refere a posição Y
+        self.rect[1] = SCREEN_HEIGHT / 2
+
+    def update(self):
+        # Define quantas sprites tem, no caso, o array irá "rodar" entre os valores
+        # 0, 1 e 2, mudando as imagens
+        self.current_image = (self.current_image + 1) % 2
+        self.image = self.images[self.current_image]
+
+        #controles do jogador
+        control = pygame.key.get_pressed()
+        if control[pygame.K_UP]:
+            bird.rect[1] -= SPEED
+        if control[pygame.K_DOWN]:
+            bird.rect[1] += SPEED
+        if control[pygame.K_LEFT]:
+            bird.rect[0] -= SPEED
+        if control[pygame.K_RIGHT]:
+            bird.rect[0] += SPEED
+
+    
+    def walk(self):
+        print('andou!')
+        
+
+#Criar classe Ground, bg que acompanha o personagem
+# class Ground(pygame.sprite.Sprite):
+
+#     # a classe Ground() pode ter sua posição definida durante sua execução (xpos)
+#     def __init__(self, xpos):
+#         #inicializar sprite
+#         pygame.sprite.Sprite.__init__(self)
+
+#         #load na imagem do ground
+#         self.image = pygame.image.load('assets/base.png').convert_alpha()
+#         #Criar máscara de colisão
+#         self.mask = pygame.mask.from_surface(self.image)
+#         #tamanhos da imagem do ground
+#         self.image = pygame.transform.scale(self.image, (GROUND_WIDTH, GROUND_HEIGHT))
+#         #pegar posição da imagem
+#         self.rect = self.image.get_rect()
+#         #Ground começa onde é invocado durante a função
+#         self.rect[0] = xpos
+#         #Ground fica no fundo da tela
+#         self.rect[1] = SCREEN_HEIGHT - GROUND_HEIGHT
+
+#     def update(self):
+#         #mover o ground junto com o jogo
+#         self.rect[0] -= GAME_SPEED
+
+class Pipe(pygame.sprite.Sprite):
+
+    def __init__(self, inverted, xpos, ysize):
+        #inicializar sprite
+        pygame.sprite.Sprite.__init__(self)
+
+        self.image = pygame.image.load('assets/pipe-red.png').convert_alpha()
+        self.image = pygame.transform.scale(self.image, (PIPE_WIDTH, PIPE_HEIGHT))
+
+        self.rect = self.image.get_rect()
+
+        self.rect[0] = xpos
+
+        #inverter a pipe, se necessário
+        if inverted:
+            self.image = pygame.transform.flip(self.image, False, True)
+            self.rect[1] = - (self.rect[3] - ysize)
+        else:
+            self.rect[1] = SCREEN_HEIGHT - ysize
+
+        self.mask = pygame.mask.from_surface(self.image)
+
+    def update(self):
+        self.rect[0] -= GAME_SPEED
+
+
+#Função para verificar se a sprite está fora da tela
+def is_of_screen(sprite):
+    return sprite.rect[0] < -(sprite.rect[2])
+
+#Função para criar canos aleatórios
+def get_random_pipes(xpos):
+    #Cani de tamanho aleatório
+    size = random.randint(100, 300)
+    pipe = Pipe(False, xpos, size)
+    pipe_inverted = Pipe(True, xpos, SCREEN_HEIGHT - size - PIPE_GAP)
+    return (pipe, pipe_inverted)
 
 # Inicializador do jogo
 pygame.init()
-pygame.mixer.init()
-screen = pygame.display.set_mode([WIDTH, HEIGHT])
+
+#display do nome do jogo
 pygame.display.set_caption(TITLE)
-relogio = pygame.time.Clock().tick(FPS)
 
-################################################################
-class Level(object):
-    def load_file(self, filename="level.map"):
-        self.map = []
-        self.key = {}
-        parser = configparser.ConfigParser()
-        parser.read(filename)
-        self.tileset = parser.get("level", "tileset")
-        self.map = parser.get("level", "map").split("\n")
-        for section in parser.sections():
-            if len(section) == 1:
-                desc = dict(parser.items(section))
-                self.key[section] = desc
-        self.width = len(self.map[0])
-        self.height = len(self.map)
+#configurações de tela
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-        self.items = {}
-        for y, line in enumerate(self.map):
-            for x, c in enumerate(line):
-                if not self.is_wall(x, y) and 'sprite' in self.key[c]:
-                    self.items[(x, y)] = self.key[c]
+BACKGROUND = pygame.image.load('assets/background-day.png')
 
-    def get_tile(self, x, y):
-        try:
-            char = self.map[y][x]
-        except IndexError:
-            return {}
-        try:
-            return self.key[char]
-        except KeyError:
-            return {}
+#A imagem de bg terá o tamanho (SCREEN_WIDTH, SCREEN_HEIGHT)
+BACKGROUND = pygame.transform.scale(BACKGROUND, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
-    def get_tile(self, x, y):
-        """Tell what's at the specified position of the map."""
+#Criar um grupo de passaros, criar um pássaro e adicioná-lo no grupo
+bird_group = pygame.sprite.Group()
+bird = Bird()
+bird_group.add(bird)
 
-        try:
-            char = self.map[y][x]
-        except IndexError:
-            return {}
-        try:
-            return self.key[char]
-        except KeyError:
-            return {}
+#Criar grupo do Ground
+# ground_group = pygame.sprite.Group()
 
-    def get_bool(self, x, y, name):
-        """Tell if the specified flag is set for position on the map."""
+# O xpos irá loopar de maneira que o primeiro caso ele aparecerá em X 0,
+# o segundo logo após a SCREEN_WIDTH pasasr e assim irá loopar
+# for i in range(2):
+#     # A largura do chão é o dobro da largura da tela
+#     ground = Ground(GROUND_WIDTH * i)
+#     ground_group.add(ground)
 
-        value = self.get_tile(x, y).get(name)
-        return value in (True, 1, 'true', 'yes', 'True', 'Yes', '1', 'on', 'On')
 
-    def is_wall(self, x, y):
-        """Is there a wall?"""
+#Criar grupo de pipes
+pipe_group = pygame.sprite.Group()
 
-        return self.get_bool(x, y, 'wall')
+for i in range(2):
+    pipes = get_random_pipes(SCREEN_WIDTH * i + 800)
+    pipe_group.add(pipes[0])
+    pipe_group.add(pipes[1])
 
-    def is_blocking(self, x, y):
-        """Is this place blocking movement?"""
+#fps
+clock = pygame.time.Clock()
 
-        if not 0 <= x < self.width or not 0 <= y < self.height:
-            return True
-        return self.get_bool(x, y, 'block')
+while True:
+    #definir fps no jogo
+    clock.tick(FPS)
+    #loop básico
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            pygame.quit()
 
-    def is_wall(self, x, y):
-        return self.get_bool(x, y, 'wall')
+        if event.type == KEYDOWN:
+            bird.walk()
 
-    def render(self):
-        wall = self.is_wall
-        tiles = MAP_CACHE[self.tileset]
-        image = pygame.Surface((self.width*MAP_TILE_WIDTH, self.height*MAP_TILE_HEIGHT))
-        overlays = {}
-        for map_y, line in enumerate(self.map):
-            for map_x, c in enumerate(line):
-                if wall(map_x, map_y):
-                    # Draw different tiles depending on neighbourhood
-                    if not wall(map_x, map_y+1):
-                        if wall(map_x+1, map_y) and wall(map_x-1, map_y):
-                            tile = 1, 2
-                        elif wall(map_x+1, map_y):
-                            tile = 0, 2
-                        elif wall(map_x-1, map_y):
-                            tile = 2, 2
-                        else:
-                            tile = 3, 2
-                    else:
-                        if wall(map_x+1, map_y+1) and wall(map_x-1, map_y+1):
-                            tile = 1, 1
-                        elif wall(map_x+1, map_y+1):
-                            tile = 0, 1
-                        elif wall(map_x-1, map_y+1):
-                            tile = 2, 1
-                        else:
-                            tile = 3, 1
-                    # Add overlays if the wall may be obscuring something
-                    if not wall(map_x, map_y-1):
-                        if wall(map_x+1, map_y) and wall(map_x-1, map_y):
-                            over = 1, 0
-                        elif wall(map_x+1, map_y):
-                            over = 0, 0
-                        elif wall(map_x-1, map_y):
-                            over = 2, 0
-                        else:
-                            over = 3, 0
-                        overlays[(map_x, map_y)] = tiles[over[0]][over[1]]
-                else:
-                    try:
-                        tile = self.key[c]['tile'].split(',')
-                        tile = int(tile[0]), int(tile[1])
-                    except (ValueError, KeyError):
-                        # Default to ground tile
-                        tile = 0, 3
-                tile_image = tiles[tile[0]][tile[1]]
-                image.blit(tile_image,
-                           (map_x*MAP_TILE_WIDTH, map_y*MAP_TILE_HEIGHT))
-        return image, overlays
-################################################################
+    # criar imagem de BACKGROUND na posição 0,0
+    screen.blit(BACKGROUND, (0,0))
 
-#Classe para tiles com 'lazy loading'
-class TileCache:
-    """Load the tilesets lazily into global cache"""
+    # if is_of_screen(ground_group.sprites()[0]):
+        #se o ground estiver fora da visão, deletar esse ground
+        # ground_group.remove(ground_group.sprites()[0])
+        #criar novo ground, com -20 pxs de distância para parecer "infinito"
+        # new_ground = Ground(GROUND_WIDTH - 20)
+        #adicionar esse novo ground na tela
+        # ground_group.add(new_ground)
 
-    def __init__(self,  width=32, height=None):
-        self.width = width
-        self.height = height or width
-        self.cache = {}
+    if is_of_screen(pipe_group.sprites()[0]):
+        pipe_group.remove(pipe_group.sprites()[0])
+        pipe_group.remove(pipe_group.sprites()[0])
 
-    def __getitem__(self, filename):
-        """Return a table of tiles, load it from disk if needed."""
+        pipes = get_random_pipes(SCREEN_WIDTH * 2)
 
-        key = (filename, self.width, self.height)
-        try:
-            return self.cache[key]
-        except KeyError:
-            tile_table = self._load_tile_table(filename, self.width, self.height)
-            self.cache[key] = tile_table
-            return tile_table
+        pipe_group.add(pipes[0])
+        pipe_group.add(pipes[1])
 
-    def _load_tile_table(self, filename, width, height):
-        """Load an image and split it into tiles."""
+    # atualizar o grupo dos pássaros
+    bird_group.update()
 
-        image = pygame.image.load(filename).convert()
-        image_width, image_height = image.get_size()
-        tile_table = []
-        for tile_x in range(0, image_width//width):
-            line = []
-            tile_table.append(line)
-            for tile_y in range(0, image_height//height):
-                rect = (tile_x*width, tile_y*height, width, height)
-                line.append(image.subsurface(rect))
-        return tile_table
-################################################################
-#Classe sprite
-class Sprite(pygame.sprite.Sprite):
-    def __init__(self, pos=(0, 0), frames=None):
-        super(Sprite, self).__init__()
-        self.frames = frames
-        self.animation = self.stand_animation()
-        self.image = frames[0][0]
-        self.rect = self.image.get_rect()
-        self.pos = pos
+    #atualizar grupo do ground
+    # ground_group.update()
 
-    def stand_animation(self):
-        while True:
-            for frame in self.frames[0]:
-                self.image = frame
-                yield None
-                yield None
+    # pipe_group.update()
 
-    def update(self, *args):
-        next(self.animation)
+    #desenhar o grupo dos pássaros na tela
+    bird_group.draw(screen)
 
-    def _get_pos(self):
-        """Check the current position of the sprite on the map."""
+    # pipe_group.draw(screen)
 
-        return (self.rect.midbottom[0]-12)/24, (self.rect.midbottom[1]-16)/16
+    #desenhar groupo ground na tela
+    # ground_group.draw(screen)
 
-    def _set_pos(self, pos):
-        """Set the position and depth of the sprite on the map."""
+    # se o pássaro colidir com o ground...
+    # Importante, a função pygame.sprite.collide_mask faz com que apenas pixels
+    # que não são transparentes contem para uma colisão
+    if False:
+        #O jogo acaba
+        break
 
-        self.rect.midbottom = pos[0]*24+12, pos[1]*16+16
-        self.depth = self.rect.midbottom[1]
-
-    pos = property(_get_pos, _set_pos)
-
-    def move(self, dx, dy):
-        """Change the position of the sprite on screen."""
-
-        self.rect.move_ip(dx, dy)
-        self.depth = self.rect.midbottom[1]
-
-################################################################
-
-if __name__ == '__main__':
-    MAP_TILE_WIDTH = 24
-    MAP_TILE_HEIGHT = 16
-    # MAP_CACHE = {
-    #     'ground.png': carregar_tiles('./assets/ambientes/teste/ground.png', 
-    #     MAP_TILE_WIDTH, MAP_TILE_HEIGHT),
-    # }
-    MAP_CACHE = TileCache(MAP_TILE_WIDTH, MAP_TILE_HEIGHT)
-
-    level = Level()
-    level.load_file('./assets/ambientes/teste/level.map')
-
-    # sprites de caixas
-    SPRITE_CACHE = TileCache(32, 32)
-    sprites = pygame.sprite.RenderUpdates()
-    for pos, tile in level.items.items():
-        sprite = Sprite(pos, SPRITE_CACHE[tile["sprite"]])
-        sprites.add(sprite)
-
-    background, overlay_dict = level.render()
-    overlays = pygame.sprite.RenderUpdates()
-    for (x, y), image in overlay_dict.items():
-        overlay = pygame.sprite.Sprite(overlays)
-        overlay.image = image
-        overlay.rect = image.get_rect().move(x * 24, y * 16 - 16)
-
-        screen.blit(background, (0, 0))
-        sprites.clear(screen, background)
-        sprites.update()
-        dirty = sprites.draw(screen)
-        overlays.draw(screen)
-
-    overlays.draw(screen)
-    pygame.display.flip()
-    # table = _load_tile_table("./assets/ambientes/teste/ground.png", 24, 16)
-
-    game_over = False
-    while not game_over:
-
-    # XXX draw all the objects here
-        overlays.draw(screen)
-        pygame.display.flip()
-        for event in pygame.event.get():
-            if event.type == pygame.locals.QUIT:
-                game_over = True
-            elif event.type == pygame.locals.KEYDOWN:
-                pressed_key = event.key
-
-    while pygame.event.wait().type != pygame.locals.QUIT:
-        pass
+    pygame.display.update()
