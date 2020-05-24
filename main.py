@@ -10,7 +10,7 @@ FPS = 30
 
 #Velocidade do protag
 CHAR_WIDTH, CHAR_HEIGHT = ((32),(32))
-SPEED = 5
+SPEED = 4
 
 #Medidas do ground
 GROUND_WIDTH = 2 * SCREEN_WIDTH
@@ -26,18 +26,23 @@ GRAVITY = 1
 #velocidade horizontal do jogo
 GAME_SPEED = 10
 
-#Criar classe Bird, o personagem principal
-class Bird(pygame.sprite.Sprite):
+#Criar classe Protag, o personagem principal
+class Protag(pygame.sprite.Sprite):
 
     #código de inicialização de toda classe Sprite do pygame
     def __init__(self):
         #inicializar sprite
         pygame.sprite.Sprite.__init__(self)
 
-        #Objeto com todas as imagens do protag, para animações
+        #Trocar apenas as sprites de acordo com o movimento
         self.images = [
-            pygame.image.load('assets/personagens/protagonista/front1.png').convert_alpha(),
-            pygame.image.load('assets/personagens/protagonista/front2.png').convert_alpha(),
+            #front
+            pygame.image.load('assets/personagens/protagonista/front.png').convert_alpha(),
+            #back
+            pygame.image.load('assets/personagens/protagonista/back.png').convert_alpha(),
+            #Side NOTA: Sempre está a direita, usar flip()
+            pygame.image.load('assets/personagens/protagonista/side1.png').convert_alpha(),
+            pygame.image.load('assets/personagens/protagonista/side2.png').convert_alpha(),
         ]
         # Tamanho das sprites
         for i in range(len(self.images)):
@@ -46,10 +51,8 @@ class Bird(pygame.sprite.Sprite):
         #Velocidade
         self.speed = SPEED
 
-        #imagem do começo
-        self.current_image = 0
         #A função convert_alpha faz imagens png serem transparentes
-        self.image = pygame.image.load('assets/personagens/protagonista/front1.png').convert_alpha()
+        self.image = self.images[0]
         #Criar máscara de colisão
         self.mask = pygame.mask.from_surface(self.image)
         #Necessário para posicionar a sprite na tela
@@ -60,21 +63,26 @@ class Bird(pygame.sprite.Sprite):
         self.rect[1] = SCREEN_HEIGHT / 2
 
     def update(self):
-        # Define quantas sprites tem, no caso, o array irá "rodar" entre os valores
-        # 0, 1 e 2, mudando as imagens
-        self.current_image = (self.current_image + 1) % 2
-        self.image = self.images[self.current_image]
 
         #controles do jogador
         control = pygame.key.get_pressed()
         if control[pygame.K_UP]:
-            bird.rect[1] -= SPEED
+            self.image = self.images[1]
+            protag.rect[1] -= SPEED
         if control[pygame.K_DOWN]:
-            bird.rect[1] += SPEED
+            self.image = self.images[0]
+            protag.rect[1] += SPEED
         if control[pygame.K_LEFT]:
-            bird.rect[0] -= SPEED
+            self.image = self.images[3]
+            #Achar maneira de saber que a tecla CONTINUA
+            #sendo precionada, para alterar a sprite
+            
+            #Virar a imagem para a esquerda
+            self.image = pygame.transform.flip(self.image, True, False)
+            protag.rect[0] -= SPEED
         if control[pygame.K_RIGHT]:
-            bird.rect[0] += SPEED
+            self.image = self.images[3]
+            protag.rect[0] += SPEED
 
     
     def walk(self):
@@ -153,15 +161,15 @@ pygame.display.set_caption(TITLE)
 #configurações de tela
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
-BACKGROUND = pygame.image.load('assets/background-day.png')
+BACKGROUND = pygame.image.load('assets/ambientes/quarto/room.png')
 
 #A imagem de bg terá o tamanho (SCREEN_WIDTH, SCREEN_HEIGHT)
 BACKGROUND = pygame.transform.scale(BACKGROUND, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
 #Criar um grupo de passaros, criar um pássaro e adicioná-lo no grupo
-bird_group = pygame.sprite.Group()
-bird = Bird()
-bird_group.add(bird)
+protag_group = pygame.sprite.Group()
+protag = Protag()
+protag_group.add(protag)
 
 #Criar grupo do Ground
 # ground_group = pygame.sprite.Group()
@@ -188,13 +196,14 @@ clock = pygame.time.Clock()
 while True:
     #definir fps no jogo
     clock.tick(FPS)
-    #loop básico
+
+    #Loop básico
     for event in pygame.event.get():
         if event.type == QUIT:
             pygame.quit()
 
         if event.type == KEYDOWN:
-            bird.walk()
+            protag.walk()
 
     # criar imagem de BACKGROUND na posição 0,0
     screen.blit(BACKGROUND, (0,0))
@@ -217,7 +226,7 @@ while True:
         pipe_group.add(pipes[1])
 
     # atualizar o grupo dos pássaros
-    bird_group.update()
+    protag_group.update()
 
     #atualizar grupo do ground
     # ground_group.update()
@@ -225,7 +234,7 @@ while True:
     # pipe_group.update()
 
     #desenhar o grupo dos pássaros na tela
-    bird_group.draw(screen)
+    protag_group.draw(screen)
 
     # pipe_group.draw(screen)
 
